@@ -1,9 +1,23 @@
 // Require Fastify and instantiate it
 const fastify = require('fastify')({ logger: true });
+const crypto = require('crypto');
 
 // Declare a simple route
 fastify.get('/', async (request, reply) => {
     return { hello: 'world' };
+});
+
+// POST /api/share endpoint
+fastify.post('/api/share', async (request, reply) => {
+    const { title, content } = request.body;
+    
+    // Generate a UUID for the share path
+    const shareId = crypto.randomUUID();
+    
+    // Return the sharePath in the expected format
+    return {
+        sharePath: `/share/${shareId}`
+    };
 });
 
 // Start the server
