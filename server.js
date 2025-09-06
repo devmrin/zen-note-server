@@ -1,30 +1,25 @@
-// Require dependencies
-require('dotenv').config();  // Load env variables
+require('dotenv').config();
 const fastify = require('fastify')({ logger: true });
 const crypto = require('crypto');
 const cors = require('@fastify/cors');
 const Redis = require('ioredis');
 
-// Initialize a single Redis client instance
+// Single shared Redis client instance
 const redis = new Redis(process.env.REDIS_URL);
 
-// Global Redis error handler
 redis.on('error', (err) => {
     console.error('Redis connection error:', err);
 });
 
-// Register CORS plugin
 fastify.register(cors, {
     origin: 'https://zen.mrinmay.dev',
     methods: ['GET', 'POST', 'OPTIONS'],
 });
 
-// Health check route
 fastify.get('/', async (request, reply) => {
     return { hello: 'world' };
 });
 
-// POST /api/share endpoint
 fastify.post('/api/share', async (request, reply) => {
     try {
         const { title, content } = request.body;
@@ -37,9 +32,8 @@ fastify.post('/api/share', async (request, reply) => {
         const redisKey = `note:${shareId}`;
         const note = { title, content };
 
-        // Store note using RedisJSON and set TTL of 60s
-        await redis.call('JSON.SET', redisKey, '.', JSON.stringify(note));
-        await redis.expire(redisKey, 60);
+        // Store as plain string with 60s TTL
+        await redis.set(redisKey, JSON.stringify(note), 'EX', 60);
 
         return {
             sharePath: `/share/${shareId}`
@@ -50,13 +44,12 @@ fastify.post('/api/share', async (request, reply) => {
     }
 });
 
-// GET /api/shared/:shareId endpoint
 fastify.get('/api/shared/:shareId', async (request, reply) => {
     try {
         const { shareId } = request.params;
         const redisKey = `note:${shareId}`;
 
-        const data = await redis.call('JSON.GET', redisKey, '.');
+        const data = await redis.get(redisKey);
 
         if (!data) {
             return reply.status(404).send({ error: 'Note not found or expired' });
@@ -70,7 +63,6 @@ fastify.get('/api/shared/:shareId', async (request, reply) => {
     }
 });
 
-// Start the server
 const start = async () => {
     try {
         const port = Number(process.env.PORT) || 3000;
