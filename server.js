@@ -1,18 +1,22 @@
-// Require the framework and instantiate it
-const fastify = require('fastify')({ logger: true })
+// Require Fastify and instantiate it
+const fastify = require('fastify')({ logger: true });
 
-// Declare a route
+// Declare a simple route
 fastify.get('/', async (request, reply) => {
-  return { hello: 'world' }
-})
+    return { hello: 'world' };
+});
 
-// Run the server!
+// Start the server
 const start = async () => {
-  try {
-    await fastify.listen(process.env.PORT || 3000, '0.0.0.0')
-  } catch (err) {
-    fastify.log.error(err)
-    process.exit(1)
-  }
-}
-start()
+    try {
+        const port = Number(process.env.PORT) || 3000;
+
+        await fastify.listen({ port, host: '0.0.0.0' });
+        console.log(`Server listening at http://0.0.0.0:${port}`);
+    } catch (err) {
+        fastify.log.error(err);
+        process.exit(1);
+    }
+};
+
+start();
