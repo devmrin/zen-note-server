@@ -27,7 +27,7 @@ const config = {
         url: process.env.REDIS_URL
     },
     cors: {
-        origin: 'https://zen.mrinmay.dev',
+        origin: ['https://zen.mrinmay.dev', 'https://mrinmay.dev'],
         methods: ['GET', 'POST', 'OPTIONS'],
         credentials: false
     },

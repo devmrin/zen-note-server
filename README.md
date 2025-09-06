@@ -122,7 +122,7 @@ Response:
 - **Response**: 429 status with retry information
 
 ### CORS Configuration
-- **Origin**: `https://zen.mrinmay.dev`
+- **Origin**: `https://zen.mrinmay.dev / https://mrinmay.dev`
 - **Methods**: GET, POST, OPTIONS
 - **Credentials**: Explicitly disabled
 
@@ -146,7 +146,7 @@ All configuration is centralized in `src/config/index.js`:
     url: process.env.REDIS_URL
   },
   cors: {
-    origin: 'https://zen.mrinmay.dev',
+    origin: ['https://zen.mrinmay.dev', 'https://mrinmay.dev'],
     credentials: false
   },
   rateLimit: {

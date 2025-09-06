@@ -47,7 +47,7 @@ fastify.register(rateLimit, {
 
 // Register CORS with explicit credentials disabled
 fastify.register(cors, {
-    origin: 'https://zen.mrinmay.dev',
+    origin: ['https://zen.mrinmay.dev', 'https://mrinmay.dev'],
     methods: ['GET', 'POST', 'OPTIONS'],
     credentials: false
 });
