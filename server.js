@@ -1,45 +1,73 @@
-// Require Fastify and instantiate it
+// Require dependencies
+require('dotenv').config();  // Load env variables
 const fastify = require('fastify')({ logger: true });
 const crypto = require('crypto');
 const cors = require('@fastify/cors');
+const Redis = require('ioredis');
+
+// Initialize a single Redis client instance
+const redis = new Redis(process.env.REDIS_URL);
+
+// Global Redis error handler
+redis.on('error', (err) => {
+    console.error('Redis connection error:', err);
+});
 
 // Register CORS plugin
 fastify.register(cors, {
-    origin: 'https://zen.mrinmay.dev',   // Allow only your frontend origin
+    origin: 'https://zen.mrinmay.dev',
     methods: ['GET', 'POST', 'OPTIONS'],
 });
 
-// Declare a simple route
+// Health check route
 fastify.get('/', async (request, reply) => {
     return { hello: 'world' };
 });
 
 // POST /api/share endpoint
 fastify.post('/api/share', async (request, reply) => {
-    const { title, content } = request.body;
+    try {
+        const { title, content } = request.body;
 
-    // TODO: Save the note to the redis database with TTL
+        if (!title || !content) {
+            return reply.status(400).send({ error: 'Missing title or content' });
+        }
 
-    // Generate a UUID for the share path
-    const shareId = crypto.randomUUID();
+        const shareId = crypto.randomUUID();
+        const redisKey = `note:${shareId}`;
+        const note = { title, content };
 
-    // Return the sharePath in the expected format
-    return {
-        sharePath: `/share/${shareId}`
-    };
+        // Store note using RedisJSON and set TTL of 60s
+        await redis.call('JSON.SET', redisKey, '.', JSON.stringify(note));
+        await redis.expire(redisKey, 60);
+
+        return {
+            sharePath: `/share/${shareId}`
+        };
+    } catch (err) {
+        console.error('Error in POST /api/share:', err);
+        return reply.status(500).send({ error: 'Internal Server Error' });
+    }
 });
 
 // GET /api/shared/:shareId endpoint
 fastify.get('/api/shared/:shareId', async (request, reply) => {
-    const { shareId } = request.params;
-    
-    // TODO: Look up the shared note from Redis using shareId
-    
-    // For now, return static JSON regardless of shareId
-    return {
-        "title": "Meeting Notes - Q4 Planning",
-        "content": "<h2>Q4 Planning Meeting</h2>\n<p><strong>Date:</strong> September 6, 2025</p>\n<p><strong>Attendees:</strong> Team leads, Product managers</p>\n<h3>Key Discussion Points:</h3>\n<ul>\n  <li>Product roadmap for Q4</li>\n  <li>Resource allocation</li>\n  <li>Timeline adjustments</li>\n</ul>\n<h3>Action Items:</h3>\n<ol>\n  <li>Review budget proposals by Friday</li>\n  <li>Schedule follow-up meetings with stakeholders</li>\n  <li>Update project timelines</li>\n</ol>"
-    };
+    try {
+        const { shareId } = request.params;
+        const redisKey = `note:${shareId}`;
+
+        const data = await redis.call('JSON.GET', redisKey, '.');
+
+        if (!data) {
+            return reply.status(404).send({ error: 'Note not found or expired' });
+        }
+
+        const note = JSON.parse(data);
+        return note;
+    } catch (err) {
+        console.error('Error in GET /api/shared/:shareId:', err);
+        return reply.status(500).send({ error: 'Internal Server Error' });
+    }
 });
 
 // Start the server
