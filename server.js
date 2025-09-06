@@ -1,77 +1,74 @@
-require('dotenv').config();
-const fastify = require('fastify')({ logger: true });
-const crypto = require('crypto');
-const cors = require('@fastify/cors');
-const Redis = require('ioredis');
+const fastify = require('fastify');
+const config = require('./src/config');
+const { registerMiddleware } = require('./src/middleware');
+const { registerRoutes } = require('./src/routes');
+const redisClient = require('./src/utils/redis');
 
-// Single shared Redis client instance
-const redis = new Redis(process.env.REDIS_URL);
+/**
+ * Create and configure the Fastify application
+ */
+async function createApp() {
+    // Create Fastify instance with enhanced logging
+    const app = fastify({
+        logger: config.server.logger,
+        genReqId: () => require('crypto').randomUUID()
+    });
 
-redis.on('error', (err) => {
-    console.error('Redis connection error:', err);
-});
+    // Set logger reference in Redis client
+    redisClient.setLogger(app.log);
 
-fastify.register(cors, {
-    origin: 'https://zen.mrinmay.dev',
-    methods: ['GET', 'POST', 'OPTIONS'],
-});
+    // Register middleware
+    await registerMiddleware(app);
 
-fastify.get('/', async (request, reply) => {
-    return { hello: 'world' };
-});
+    // Register routes
+    await registerRoutes(app);
 
-fastify.post('/api/share', async (request, reply) => {
-    try {
-        const { title, content } = request.body;
-
-        if (!title || !content) {
-            return reply.status(400).send({ error: 'Missing title or content' });
+    // Graceful shutdown hook
+    app.addHook('onClose', async (instance, done) => {
+        try {
+            app.log.info('Shutting down server gracefully...');
+            await redisClient.quit();
+            app.log.info('Redis connection closed');
+            done();
+        } catch (err) {
+            app.log.error({ err }, 'Error during graceful shutdown');
+            done(err);
         }
+    });
 
-        const shareId = crypto.randomUUID();
-        const redisKey = `note:${shareId}`;
-        const note = { title, content };
+    return app;
+}
 
-        // Store as plain string with 60s TTL
-        await redis.set(redisKey, JSON.stringify(note), 'EX', 60);
-
-        return {
-            sharePath: `/share/${shareId}`
-        };
-    } catch (err) {
-        console.error('Error in POST /api/share:', err);
-        return reply.status(500).send({ error: 'Internal Server Error' });
-    }
-});
-
-fastify.get('/api/shared/:shareId', async (request, reply) => {
+/**
+ * Start the server
+ */
+async function start() {
     try {
-        const { shareId } = request.params;
-        const redisKey = `note:${shareId}`;
+        const app = await createApp();
+        
+        // Handle process signals for graceful shutdown
+        process.on('SIGINT', () => {
+            app.log.info('Received SIGINT, shutting down gracefully');
+            app.close();
+        });
 
-        const data = await redis.get(redisKey);
+        process.on('SIGTERM', () => {
+            app.log.info('Received SIGTERM, shutting down gracefully');
+            app.close();
+        });
 
-        if (!data) {
-            return reply.status(404).send({ error: 'Note not found or expired' });
-        }
-
-        const note = JSON.parse(data);
-        return note;
+        // Start listening
+        await app.listen({ 
+            port: config.server.port, 
+            host: config.server.host 
+        });
+        
+        app.log.info(`Server listening at http://${config.server.host}:${config.server.port}`);
     } catch (err) {
-        console.error('Error in GET /api/shared/:shareId:', err);
-        return reply.status(500).send({ error: 'Internal Server Error' });
-    }
-});
-
-const start = async () => {
-    try {
-        const port = Number(process.env.PORT) || 3000;
-        await fastify.listen({ port, host: '0.0.0.0' });
-        console.log(`Server listening at http://0.0.0.0:${port}`);
-    } catch (err) {
-        fastify.log.error(err);
+        console.error('Failed to start server:', err);
         process.exit(1);
     }
-};
+}
 
+// Start the server
 start();
