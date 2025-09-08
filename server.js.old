@@ -66,7 +66,7 @@ const shareSchema = {
         content: {
             type: 'string',
             minLength: 1,
-            maxLength: 50000 // 50KB limit
+            maxLength: 500000 // 500KB limit
         }
     },
     additionalProperties: false

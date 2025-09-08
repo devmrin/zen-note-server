@@ -112,7 +112,7 @@ Response:
 
 ### Input Validation
 - **Title**: 1-200 characters
-- **Content**: 1-50,000 characters (50KB limit)
+- **Content**: 1-500,000 characters (500KB limit)
 - **Share ID**: Strict UUID format validation
 - **HTML Entity Encoding**: Prevents XSS attacks
 
