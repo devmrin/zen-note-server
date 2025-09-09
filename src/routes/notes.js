@@ -17,15 +17,14 @@ async function notesRoutes(fastify) {
         try {
             const { title, content } = request.body;
 
-            // Sanitize inputs (basic HTML entity encoding)
+            // Sanitize only the title. Accept raw HTML for content.
             const sanitizedTitle = sanitizeInput(title);
-            const sanitizedContent = sanitizeInput(content);
 
             const shareId = crypto.randomUUID();
             const redisKey = `note:${shareId}`;
-            const note = { 
-                title: sanitizedTitle, 
-                content: sanitizedContent,
+            const note = {
+                title: sanitizedTitle,
+                content: content,
                 createdAt: new Date().toISOString()
             };
 

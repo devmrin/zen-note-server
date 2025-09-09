@@ -9,9 +9,10 @@ const shareSchema = {
             pattern: '^[\\s\\S]*$' // Allow any characters but enforce length
         },
         content: {
+            // Accept raw HTML string as-is
             type: 'string',
             minLength: 1,
-            maxLength: 500000 // 500KB limit
+            maxLength: 500000
         }
     },
     additionalProperties: false
