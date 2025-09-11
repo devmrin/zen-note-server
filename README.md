@@ -1,220 +1,329 @@
 # Zen Note Server
 
-A robust, production-ready Node.js server built with Fastify for sharing temporary notes with enhanced security and reliability features.
+A high-performance Node.js server for the Zen Note application with real-time collaboration features.
 
 ## Features
 
-- **Temporary Note Sharing**: Create and share notes with 60-second expiration
-- **Input Validation**: JSON schema validation with length limits and sanitization
-- **Rate Limiting**: 10 requests per minute to prevent abuse
-- **Security**: CORS configuration, XSS prevention, and secure error handling
-- **Structured Logging**: Request IDs, error tracking, and sensitive data redaction
-- **Graceful Shutdown**: Proper Redis cleanup and signal handling
-- **Modular Architecture**: Clean separation of concerns for maintainability
+- **Note Sharing**: Share notes with temporary, secure links
+- **Real-time Collaboration**: Multi-user collaborative editing with Y.js CRDT
+- **WebSocket Support**: Real-time synchronization and presence awareness
+- **Local-First Architecture**: Temporary collaboration with automatic cleanup
+- **Redis Integration**: Efficient session management and document persistence
+- **Rate Limiting**: Built-in protection against abuse
+- **Health Monitoring**: Comprehensive health check endpoints
+
+## Architecture
+
+### Collaboration System
+
+The server implements a **hybrid local-first + temporary collaboration** system:
+
+- **Local-First**: Primary data persists in client-side storage
+- **Temporary Sessions**: Real-time collaboration via WebSocket + Redis (20-min TTL)
+- **Opt-in Collaboration**: Collaboration is explicitly enabled per note
+- **Secure Sessions**: Unguessable UUIDv4 session IDs
+- **Automatic Cleanup**: Sessions expire automatically with comprehensive cleanup
+
+### Technology Stack
+
+- **Framework**: Fastify with TypeScript
+- **Real-time**: WebSocket with Y.js CRDT for conflict-free collaboration
+- **Storage**: Redis for temporary session data and document synchronization
+- **Validation**: JSON Schema validation with AJV
+- **Security**: Rate limiting, CORS, input sanitization
+
+## API Endpoints
+
+### Note Sharing (Existing)
+
+- `POST /api/share` - Create a shared note (60s TTL)
+- `GET /api/shared/:shareId` - Retrieve a shared note
+
+### Real-time Collaboration (New)
+
+- `POST /api/collab/start/:noteId` - Start collaboration session
+- `POST /api/collab/join/:sessionId` - Join existing session  
+- `DELETE /api/collab/end/:sessionId` - End collaboration session
+- `GET /api/collab/status/:sessionId` - Get session status & participants
+
+### WebSocket Endpoint
+
+- `WS /collab/:sessionId` - Real-time collaboration WebSocket
+
+### Health & Monitoring
+
+- `GET /health` - Server health check
+- `GET /health/detailed` - Detailed health information
+
+## Environment Configuration
+
+Create a `.env` file with the following variables:
+
+```env
+# Server Configuration
+PORT=3000
+
+# Redis Configuration (Required)
+REDIS_URL=redis://localhost:6379
+
+# WebSocket Configuration (Optional - defaults provided)
+WEBSOCKET_HEARTBEAT_INTERVAL=30000
+MAX_WEBSOCKET_CONNECTIONS=100
+
+# Collaboration Configuration (Optional - defaults provided)
+COLLAB_SESSION_TTL=1200
+MAX_PARTICIPANTS_PER_SESSION=10
+COLLAB_CLEANUP_INTERVAL=60000
+```
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 18+ with npm
+- Redis server running locally or accessible via URL
+- TypeScript support
+
+### Installation
+
+```bash
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Start development server
+npm run dev
+
+# Or start production server
+npm start
+```
+
+### Redis Setup
+
+#### Local Redis (macOS)
+```bash
+# Install Redis
+brew install redis
+
+# Start Redis server
+brew services start redis
+
+# Or run temporarily
+redis-server
+```
+
+#### Docker Redis
+```bash
+# Run Redis container
+docker run -d -p 6379:6379 --name zen-redis redis:7-alpine
+
+# Stop Redis container
+docker stop zen-redis
+```
+
+## Collaboration Usage
+
+### Starting a Collaboration Session
+
+```javascript
+// Start collaboration for a note
+const response = await fetch('/api/collab/start/my-note-id', {
+  method: 'POST'
+});
+
+const { sessionId, websocketUrl, expiresAt } = await response.json();
+```
+
+### Joining a Session
+
+```javascript
+// Join existing session
+const response = await fetch(`/api/collab/join/${sessionId}`, {
+  method: 'POST'
+});
+
+const { websocketUrl, noteId } = await response.json();
+```
+
+### WebSocket Connection
+
+```javascript
+// Connect to collaboration WebSocket
+const ws = new WebSocket(websocketUrl);
+
+// Set participant ID (optional)
+ws.addEventListener('open', () => {
+  // Send participant identification if needed
+  ws.send(JSON.stringify({
+    type: 'participant-id',
+    id: 'unique-participant-id'
+  }));
+});
+
+// Handle Y.js synchronization messages
+ws.addEventListener('message', (event) => {
+  const message = JSON.parse(event.data);
+  
+  switch (message.type) {
+    case 'sync-step-1':
+    case 'sync-step-2':
+    case 'sync-update':
+      // Apply Y.js updates to local document
+      break;
+    case 'awareness':
+      // Handle participant presence updates
+      break;
+  }
+});
+```
+
+## Development Scripts
+
+```bash
+# Development with auto-reload
+npm run dev
+
+# Type checking only
+npm run type-check
+
+# Build TypeScript to JavaScript
+npm run build
+
+# Start production server
+npm start
+
+# Run tests (when available)
+npm test
+```
 
 ## Project Structure
 
 ```
-zen-note-server/
-├── server.js                    # Main entry point (production-ready)
-├── src/
-│   ├── config/
-│   │   └── index.js             # Environment & server configuration
-│   ├── schemas/
-│   │   └── index.js             # JSON schema validation definitions
-│   ├── middleware/
-│   │   └── index.js             # CORS & rate limiting middleware
-│   ├── routes/
-│   │   ├── index.js             # Route registration
-│   │   ├── health.js            # Health check routes
-│   │   └── notes.js             # Notes API routes
-│   └── utils/
-│       ├── redis.js             # Redis client utility
-│       └── sanitizer.js         # Input sanitization utilities
-└── server.js.old               # Backup of original monolithic file
+src/
+├── config/           # Server configuration
+├── middleware/       # CORS & rate limiting
+├── routes/          
+│   ├── health.ts    # Health check endpoints
+│   ├── notes.ts     # Note sharing endpoints
+│   ├── collaboration.ts  # Collaboration endpoints
+│   └── index.ts     # Route registration
+├── schemas/         # JSON schema validation
+├── services/        
+│   └── collaboration.ts  # Y.js collaboration manager
+├── utils/
+│   ├── redis.ts     # Redis client utility
+│   └── sanitizer.ts # XSS prevention
+└── server.ts        # Main application entry
 ```
 
-## API Endpoints
+## Data Models
 
-### Health Check
-- **GET** `/` - Returns server status
+### Collaboration Session
 
-### Notes API
-- **POST** `/api/share` - Create a new shared note
-- **GET** `/api/shared/:shareId` - Retrieve a shared note by ID
-
-## Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/devmrin/zen-note-server.git
-cd zen-note-server
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Set up environment variables:
-```bash
-# Create .env file
-REDIS_URL=your_redis_connection_string
-PORT=3000
-```
-
-## Usage
-
-### Development
-```bash
-npm run dev
-```
-
-### Production
-```bash
-npm start
-```
-
-## API Usage Examples
-
-### Create a Shared Note
-```bash
-curl -X POST http://localhost:3000/api/share \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "My Note Title",
-    "content": "This is the note content"
-  }'
-```
-
-Response:
-```json
-{
-  "sharePath": "/share/Ab12xY_z"
+```typescript
+interface SessionMetadata {
+  noteId: string;           // Original note identifier
+  hostId: string;           // Session creator IP/ID
+  participants: string[];   // Active participant IDs
+  createdAt: number;        // Creation timestamp
+  expiresAt: number;        // Expiration timestamp (20 min TTL)
 }
 ```
 
-### Retrieve a Shared Note
-```bash
-curl http://localhost:3000/api/shared/Ab12xY_z
-```
+### Redis Data Structure
 
-Response:
-```json
-{
-  "title": "My Note Title",
-  "content": "This is the note content",
-  "createdAt": "2025-01-06T17:30:00.000Z"
+```
+# Session metadata
+collab:session:{sessionId} = SessionMetadata JSON
+
+# Y.js document state (binary)
+collab:doc:{sessionId} = Y.Doc binary state
+
+# Participant presence
+collab:presence:{sessionId}:{participantId} = {
+  name: string,
+  color: string,
+  cursor: object,
+  lastSeen: number
 }
 ```
 
 ## Security Features
 
-### Input Validation
-- **Title**: 1-200 characters
-- **Content**: 1-500,000 characters (500KB limit)
-- **Share ID**: 8-character ID (URL-safe), strict validation
-- **HTML Entity Encoding**: Prevents XSS attacks
+- **UUIDv4 Session IDs**: Cryptographically random, unguessable identifiers
+- **Time-Limited Sessions**: 20-minute automatic expiration
+- **Rate Limiting**: 10 requests per minute per IP
+- **Input Validation**: Strict JSON schema validation
+- **CORS Protection**: Configured origins whitelist
+- **XSS Prevention**: Input sanitization for titles
 
-### Rate Limiting
-- **Limit**: 10 requests per minute per IP
-- **Scope**: Applied to all endpoints
-- **Response**: 429 status with retry information
+## Monitoring & Observability
 
-### CORS Configuration
-- **Origin**: `https://zen.mrinmay.dev / https://mrinmay.dev`
-- **Methods**: GET, POST, OPTIONS
-- **Credentials**: Explicitly disabled
+### Health Checks
 
-### Error Handling
-- **Generic Responses**: No sensitive information exposed
-- **Structured Logging**: Detailed error tracking with request IDs
-- **Graceful Degradation**: Proper error status codes
+```bash
+# Basic health check
+curl http://localhost:3000/health
 
-## Configuration
+# Detailed health information
+curl http://localhost:3000/health/detailed
+```
 
-All configuration is centralized in `src/config/index.js`:
+### Metrics Tracked
 
-```javascript
-{
-  server: {
-    port: 3000,
-    host: '0.0.0.0',
-    logger: { /* structured logging config */ }
-  },
-  redis: {
-    url: process.env.REDIS_URL
-  },
-  cors: {
-    origin: ['https://zen.mrinmay.dev', 'https://mrinmay.dev'],
-    credentials: false
-  },
-  rateLimit: {
-    max: 10,
-    timeWindow: '1 minute'
-  }
+- Active collaboration sessions
+- WebSocket connections per session
+- Session duration and completion rates
+- Redis memory usage for collaboration data
+- WebSocket connection errors
+
+### Logging
+
+The server provides structured logging for:
+
+- Session lifecycle events (created, joined, expired)
+- WebSocket connection events
+- Y.js synchronization events
+- Error conditions and debugging information
+
+## Production Deployment
+
+### Environment Variables
+
+Set the following in production:
+
+```env
+PORT=3000
+REDIS_URL=redis://your-production-redis-url
+COLLAB_SESSION_TTL=1200
+MAX_PARTICIPANTS_PER_SESSION=10
+```
+
+### Reverse Proxy Configuration
+
+Ensure your reverse proxy (nginx, Apache) supports WebSocket upgrades:
+
+```nginx
+# Nginx example
+location /collab/ {
+    proxy_pass http://localhost:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
 }
 ```
 
-## Dependencies
+### Scaling Considerations
 
-### Core Dependencies
-- **fastify**: Fast and low overhead web framework
-- **@fastify/cors**: CORS support
-- **@fastify/rate-limit**: Rate limiting middleware
-- **ioredis**: Redis client for data storage
-- **dotenv**: Environment variable management
-
-## Deployment
-
-### Environment Variables
-```bash
-REDIS_URL=redis://your-redis-instance
-PORT=3000
-```
-
-### Production Considerations
-- Ensure Redis instance is properly configured
-- Set appropriate CORS origins for your domain
-- Configure proper logging levels
-- Monitor rate limiting metrics
-- Set up health checks using the `/` endpoint
-
-## Development
-
-### Adding New Routes
-1. Create route handler in `src/routes/`
-2. Register in `src/routes/index.js`
-3. Add schemas in `src/schemas/index.js` if needed
-
-### Adding Middleware
-1. Add middleware logic in `src/middleware/index.js`
-2. Register with Fastify instance
-
-### Configuration Changes
-1. Update `src/config/index.js`
-2. Add environment variables as needed
-
-## Logging
-
-The server uses structured logging with:
-- **Request IDs**: Unique identifier for each request
-- **Sensitive Data Redaction**: Authorization headers and cookies
-- **Error Context**: Detailed error information for debugging
-- **Performance Metrics**: Request/response logging
+- **Redis Clustering**: Distribute collaboration data across Redis cluster
+- **WebSocket Scaling**: Use sticky sessions or Redis adapter for multiple instances
+- **Memory Management**: Monitor Y.js document memory usage
+- **Connection Limits**: Configure appropriate WebSocket connection limits
 
 ## License
 
 ISC
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## Support
-
-For issues and questions, please use the GitHub issue tracker.

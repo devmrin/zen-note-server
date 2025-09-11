@@ -9,6 +9,18 @@ interface ShareIdParams {
 	shareId: string;
 }
 
+interface CollabStartParams {
+	noteId: string;
+}
+
+interface CollabJoinParams {
+	sessionId: string;
+}
+
+interface CollabSessionIdParams {
+	sessionId: string;
+}
+
 export const shareSchema: JSONSchemaType<ShareBody> = {
 	type: "object",
 	required: ["title", "content"],
@@ -42,4 +54,52 @@ export const shareIdSchema: JSONSchemaType<ShareIdParams> = {
 	additionalProperties: false,
 };
 
-export type { ShareBody, ShareIdParams };
+export const collabStartSchema: JSONSchemaType<CollabStartParams> = {
+	type: "object",
+	required: ["noteId"],
+	properties: {
+		noteId: {
+			type: "string",
+			pattern: "^[a-zA-Z0-9-_]+$",
+			minLength: 1,
+			maxLength: 100,
+		},
+	},
+	additionalProperties: false,
+};
+
+export const collabJoinSchema: JSONSchemaType<CollabJoinParams> = {
+	type: "object",
+	required: ["sessionId"],
+	properties: {
+		sessionId: {
+			type: "string",
+			// UUID v4 pattern
+			pattern:
+				"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+		},
+	},
+	additionalProperties: false,
+};
+
+export const collabSessionIdSchema: JSONSchemaType<CollabSessionIdParams> = {
+	type: "object",
+	required: ["sessionId"],
+	properties: {
+		sessionId: {
+			type: "string",
+			// UUID v4 pattern
+			pattern:
+				"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+		},
+	},
+	additionalProperties: false,
+};
+
+export type {
+	ShareBody,
+	ShareIdParams,
+	CollabStartParams,
+	CollabJoinParams,
+	CollabSessionIdParams,
+};

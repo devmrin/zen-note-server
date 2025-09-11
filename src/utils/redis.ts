@@ -55,6 +55,55 @@ class RedisClient {
 	}
 
 	/**
+	 * Set a binary buffer in Redis with optional expiration
+	 */
+	async setBuffer(
+		key: string,
+		value: Buffer,
+		expiration?: number,
+	): Promise<string> {
+		if (!key || !value) {
+			throw new Error(
+				"Key and value are required for Redis setBuffer operation",
+			);
+		}
+		if (expiration) {
+			return await this.client.set(key, value, "EX", expiration);
+		}
+		return await this.client.set(key, value);
+	}
+
+	/**
+	 * Get a binary buffer from Redis by key
+	 */
+	async getBuffer(key: string): Promise<Buffer | null> {
+		if (!key) {
+			throw new Error("Key is required for Redis getBuffer operation");
+		}
+		return await this.client.getBuffer(key);
+	}
+
+	/**
+	 * Delete one or more keys from Redis
+	 */
+	async del(...keys: string[]): Promise<number> {
+		if (keys.length === 0) {
+			throw new Error("At least one key is required for Redis del operation");
+		}
+		return await this.client.del(...keys);
+	}
+
+	/**
+	 * Find keys matching a pattern
+	 */
+	async keys(pattern: string): Promise<string[]> {
+		if (!pattern) {
+			throw new Error("Pattern is required for Redis keys operation");
+		}
+		return await this.client.keys(pattern);
+	}
+
+	/**
 	 * Close the Redis connection gracefully
 	 */
 	async quit(): Promise<string> {
