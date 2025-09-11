@@ -24,7 +24,8 @@ const shareIdSchema = {
     properties: {
         shareId: {
             type: 'string',
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' // UUID format
+            // 8-character NanoID: URL-safe alphanumerics
+            pattern: '^[A-Za-z0-9_-]{8}$'
         }
     },
     additionalProperties: false

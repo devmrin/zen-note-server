@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { customAlphabet } = require('nanoid');
 const { shareSchema, shareIdSchema } = require('../schemas');
 const { sanitizeInput } = require('../utils/sanitizer');
 const redisClient = require('../utils/redis');
@@ -20,7 +21,8 @@ async function notesRoutes(fastify) {
             // Sanitize only the title. Accept raw HTML for content.
             const sanitizedTitle = sanitizeInput(title);
 
-            const shareId = crypto.randomUUID();
+            const generateShareId = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 8);
+            const shareId = generateShareId();
             const redisKey = `note:${shareId}`;
             const note = {
                 title: sanitizedTitle,

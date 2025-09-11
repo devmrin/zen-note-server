@@ -21,6 +21,7 @@ const fastify = require('fastify')({
     genReqId: () => require('crypto').randomUUID()
 });
 const crypto = require('crypto');
+const { customAlphabet } = require('nanoid');
 const cors = require('@fastify/cors');
 const rateLimit = require('@fastify/rate-limit');
 const Redis = require('ioredis');
@@ -78,7 +79,7 @@ const shareIdSchema = {
     properties: {
         shareId: {
             type: 'string',
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' // UUID format
+            pattern: '^[A-Za-z0-9_-]{8}$'
         }
     },
     additionalProperties: false
@@ -107,7 +108,8 @@ fastify.post('/api/share', {
             return entities[char];
         });
 
-        const shareId = crypto.randomUUID();
+        const generateShareId = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 8);
+        const shareId = generateShareId();
         const redisKey = `note:${shareId}`;
         const note = { 
             title: sanitizedTitle, 

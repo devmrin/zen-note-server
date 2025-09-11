@@ -90,13 +90,13 @@ curl -X POST http://localhost:3000/api/share \
 Response:
 ```json
 {
-  "sharePath": "/share/550e8400-e29b-41d4-a716-446655440000"
+  "sharePath": "/share/Ab12xY_z"
 }
 ```
 
 ### Retrieve a Shared Note
 ```bash
-curl http://localhost:3000/api/shared/550e8400-e29b-41d4-a716-446655440000
+curl http://localhost:3000/api/shared/Ab12xY_z
 ```
 
 Response:
@@ -113,7 +113,7 @@ Response:
 ### Input Validation
 - **Title**: 1-200 characters
 - **Content**: 1-500,000 characters (500KB limit)
-- **Share ID**: Strict UUID format validation
+- **Share ID**: 8-character ID (URL-safe), strict validation
 - **HTML Entity Encoding**: Prevents XSS attacks
 
 ### Rate Limiting
