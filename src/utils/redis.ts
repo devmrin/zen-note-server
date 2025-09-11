@@ -1,14 +1,18 @@
-const Redis = require("ioredis");
-const config = require("../config");
+import type { FastifyBaseLogger } from "fastify";
+import Redis from "ioredis";
+import config from "../config";
 
 class RedisClient {
+	private client: Redis;
+	private logger?: FastifyBaseLogger;
+
 	constructor() {
-		this.client = new Redis(config.redis.url);
+		this.client = new Redis(config.redis.url || "");
 		this.setupEventHandlers();
 	}
 
-	setupEventHandlers() {
-		this.client.on("error", (err) => {
+	private setupEventHandlers(): void {
+		this.client.on("error", (err: Error) => {
 			// Use console as fallback until logger is set via setLogger()
 			if (this.logger) {
 				this.logger.error({ err }, "Redis connection error");
@@ -29,12 +33,8 @@ class RedisClient {
 
 	/**
 	 * Set a key-value pair in Redis with optional expiration
-	 * @param {string} key - The key to set
-	 * @param {string} value - The value to set
-	 * @param {number} [expiration] - Optional expiration time in seconds
-	 * @returns {Promise<string>} Redis response
 	 */
-	async set(key, value, expiration) {
+	async set(key: string, value: string, expiration?: number): Promise<string> {
 		if (!key || value === undefined) {
 			throw new Error("Key and value are required for Redis set operation");
 		}
@@ -46,10 +46,8 @@ class RedisClient {
 
 	/**
 	 * Get a value from Redis by key
-	 * @param {string} key - The key to retrieve
-	 * @returns {Promise<string|null>} The value or null if not found
 	 */
-	async get(key) {
+	async get(key: string): Promise<string | null> {
 		if (!key) {
 			throw new Error("Key is required for Redis get operation");
 		}
@@ -58,25 +56,23 @@ class RedisClient {
 
 	/**
 	 * Close the Redis connection gracefully
-	 * @returns {Promise<string>} Redis response
 	 */
-	async quit() {
+	async quit(): Promise<string> {
 		return await this.client.quit();
 	}
 
 	/**
 	 * Update logger reference from main app
-	 * @param {Object} logger - Fastify logger instance
 	 */
-	setLogger(logger) {
+	setLogger(logger: FastifyBaseLogger): void {
 		this.logger = logger;
 		// Update error handler to use proper logger
 		this.client.removeAllListeners("error");
-		this.client.on("error", (err) => {
-			this.logger.error({ err }, "Redis connection error");
+		this.client.on("error", (err: Error) => {
+			this.logger?.error({ err }, "Redis connection error");
 		});
 	}
 }
 
 // Export singleton instance
-module.exports = new RedisClient();
+export default new RedisClient();

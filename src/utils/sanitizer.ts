@@ -1,9 +1,9 @@
 /**
  * Sanitizes input strings to prevent XSS attacks
- * @param {string} input - The input string to sanitize
- * @returns {string} - The sanitized string
  */
-function sanitizeInput(input) {
+export function sanitizeInput(input: string): string;
+export function sanitizeInput(input: unknown): unknown;
+export function sanitizeInput(input: unknown): unknown {
 	if (typeof input !== "string") {
 		return input;
 	}
@@ -14,7 +14,7 @@ function sanitizeInput(input) {
 	}
 
 	return input.replace(/[<>&"']/g, (char) => {
-		const entities = {
+		const entities: Record<string, string> = {
 			"<": "&lt;",
 			">": "&gt;",
 			"&": "&amp;",
@@ -24,7 +24,3 @@ function sanitizeInput(input) {
 		return entities[char] || char;
 	});
 }
-
-module.exports = {
-	sanitizeInput,
-};

@@ -1,4 +1,15 @@
-const shareSchema = {
+import type { JSONSchemaType } from "ajv";
+
+interface ShareBody {
+	title: string;
+	content: string;
+}
+
+interface ShareIdParams {
+	shareId: string;
+}
+
+export const shareSchema: JSONSchemaType<ShareBody> = {
 	type: "object",
 	required: ["title", "content"],
 	properties: {
@@ -18,7 +29,7 @@ const shareSchema = {
 	additionalProperties: false,
 };
 
-const shareIdSchema = {
+export const shareIdSchema: JSONSchemaType<ShareIdParams> = {
 	type: "object",
 	required: ["shareId"],
 	properties: {
@@ -31,7 +42,4 @@ const shareIdSchema = {
 	additionalProperties: false,
 };
 
-module.exports = {
-	shareSchema,
-	shareIdSchema,
-};
+export type { ShareBody, ShareIdParams };

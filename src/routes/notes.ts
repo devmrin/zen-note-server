@@ -1,35 +1,51 @@
-const { customAlphabet } = require("nanoid");
-const { shareSchema, shareIdSchema } = require("../schemas");
-const { sanitizeInput } = require("../utils/sanitizer");
-const redisClient = require("../utils/redis");
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import {
+	type ShareBody,
+	type ShareIdParams,
+	shareIdSchema,
+	shareSchema,
+} from "../schemas";
+import redisClient from "../utils/redis";
+import { sanitizeInput } from "../utils/sanitizer";
+
+interface Note {
+	title: string;
+	content: string;
+	createdAt: string;
+}
 
 /**
  * Notes-related routes
- * @param {FastifyInstance} fastify - The Fastify instance
  */
-async function notesRoutes(fastify) {
+async function notesRoutes(fastify: FastifyInstance): Promise<void> {
 	// POST /api/share - Create a new shared note
-	fastify.post(
+	fastify.post<{
+		Body: ShareBody;
+	}>(
 		"/api/share",
 		{
 			schema: {
 				body: shareSchema,
 			},
 		},
-		async (request, reply) => {
+		async (
+			request: FastifyRequest<{ Body: ShareBody }>,
+			reply: FastifyReply,
+		) => {
 			try {
 				const { title, content } = request.body;
 
 				// Sanitize only the title. Accept raw HTML for content.
 				const sanitizedTitle = sanitizeInput(title);
 
+				const { customAlphabet } = await import("nanoid");
 				const generateShareId = customAlphabet(
 					"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
 					8,
 				);
 				const shareId = generateShareId();
 				const redisKey = `note:${shareId}`;
-				const note = {
+				const note: Note = {
 					title: sanitizedTitle,
 					content: content,
 					createdAt: new Date().toISOString(),
@@ -57,14 +73,19 @@ async function notesRoutes(fastify) {
 	);
 
 	// GET /api/shared/:shareId - Retrieve a shared note
-	fastify.get(
+	fastify.get<{
+		Params: ShareIdParams;
+	}>(
 		"/api/shared/:shareId",
 		{
 			schema: {
 				params: shareIdSchema,
 			},
 		},
-		async (request, reply) => {
+		async (
+			request: FastifyRequest<{ Params: ShareIdParams }>,
+			reply: FastifyReply,
+		) => {
 			try {
 				const { shareId } = request.params;
 				const redisKey = `note:${shareId}`;
@@ -79,7 +100,7 @@ async function notesRoutes(fastify) {
 					return reply.status(404).send({ error: "Note not found or expired" });
 				}
 
-				const note = JSON.parse(data);
+				const note: Note = JSON.parse(data);
 				fastify.log.info(
 					{ shareId, reqId: request.id },
 					"Note retrieved successfully",
@@ -96,4 +117,4 @@ async function notesRoutes(fastify) {
 	);
 }
 
-module.exports = notesRoutes;
+export default notesRoutes;
