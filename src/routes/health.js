@@ -3,9 +3,9 @@
  * @param {FastifyInstance} fastify - The Fastify instance
  */
 async function healthRoutes(fastify) {
-    fastify.get('/', async (request, reply) => {
-        return { hello: 'world' };
-    });
+	fastify.get("/", async (_request, _reply) => {
+		return { hello: "world" };
+	});
 }
 
 module.exports = healthRoutes;
