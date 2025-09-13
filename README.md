@@ -19,9 +19,9 @@ A high-performance Node.js server for the Zen Note application with real-time co
 The server implements a **hybrid local-first + temporary collaboration** system:
 
 - **Local-First**: Primary data persists in client-side storage
-- **Temporary Sessions**: Real-time collaboration via WebSocket + Redis (20-min TTL)
-- **Opt-in Collaboration**: Collaboration is explicitly enabled per note
-- **Secure Sessions**: Unguessable UUIDv4 session IDs
+- **Temporary Sessions**: Real-time collaboration via WebSocket + Redis (30-min TTL)
+- **Session-based Collaboration**: Create temporary collaborative sessions from any note
+- **Secure Sessions**: Unguessable UUIDv4 session IDs with creator permissions
 - **Automatic Cleanup**: Sessions expire automatically with comprehensive cleanup
 
 ### Technology Stack
@@ -39,12 +39,14 @@ The server implements a **hybrid local-first + temporary collaboration** system:
 - `POST /api/share` - Create a shared note (60s TTL)
 - `GET /api/shared/:shareId` - Retrieve a shared note
 
-### Real-time Collaboration (New)
+### Real-time Collaboration
 
-- `POST /api/collab/start/:noteId` - Start collaboration session
+- `POST /api/collab/create` - Create new collaboration session
+- `GET /api/collab/session/:sessionId` - Get session data and status
 - `POST /api/collab/join/:sessionId` - Join existing session  
-- `DELETE /api/collab/end/:sessionId` - End collaboration session
-- `GET /api/collab/status/:sessionId` - Get session status & participants
+- `POST /api/collab/leave/:sessionId` - Leave collaboration session
+- `DELETE /api/collab/session/:sessionId` - End session (creator only)
+- `GET /api/collab/content/:sessionId` - Get current document content
 
 ### WebSocket Endpoint
 

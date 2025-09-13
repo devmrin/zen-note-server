@@ -85,7 +85,7 @@ const config: Config = {
 		maxConnections: Number(process.env.MAX_WEBSOCKET_CONNECTIONS) || 100,
 	},
 	collaboration: {
-		sessionTTL: Number(process.env.COLLAB_SESSION_TTL) || 1200, // 20 minutes
+		sessionTTL: Number(process.env.COLLAB_SESSION_TTL) || 1800, // 30 minutes
 		maxParticipants: Number(process.env.MAX_PARTICIPANTS_PER_SESSION) || 10,
 		cleanupInterval: Number(process.env.COLLAB_CLEANUP_INTERVAL) || 60000, // 1 minute
 	},

@@ -13,6 +13,9 @@ interface CollaborationSession {
 
 interface SessionMetadata {
 	noteId: string;
+	noteTitle: string;
+	noteContent: string;
+	creatorId: string;
 	hostId: string;
 	participants: string[];
 	createdAt: number;
@@ -36,6 +39,7 @@ export class CollaborationManager {
 		ws: WebSocket,
 		sessionId: string,
 		participantId: string,
+		participantName?: string,
 	): Promise<void> {
 		try {
 			// Validate session exists and is not expired
@@ -69,10 +73,13 @@ export class CollaborationManager {
 			session.participants.add(participantId);
 			session.lastActivity = Date.now();
 
+			const displayName = participantName || `User ${participantId.slice(-4)}`;
+
 			this.logger?.info(
 				{
 					sessionId,
 					participantId,
+					participantName: displayName,
 					participantCount: session.participants.size,
 					connectionCount: session.connections.size,
 				},
@@ -97,9 +104,21 @@ export class CollaborationManager {
 
 			// Update participant presence in Redis
 			await this.updateParticipantPresence(sessionId, participantId, {
-				name: participantId,
+				id: participantId,
+				name: displayName,
 				color: this.generateParticipantColor(participantId),
+				joinedAt: Date.now(),
 				lastSeen: Date.now(),
+			});
+
+			// Notify other participants about the new joiner
+			this.broadcastParticipantUpdate(sessionId, {
+				type: "participant-joined",
+				participant: {
+					id: participantId,
+					name: displayName,
+					color: this.generateParticipantColor(participantId),
+				},
 			});
 		} catch (error) {
 			this.logger?.error(
@@ -116,10 +135,25 @@ export class CollaborationManager {
 	): Promise<CollaborationSession> {
 		const ydoc = new Y.Doc();
 
-		// Try to restore document state from Redis
+		// Try to restore document state from Redis first
 		const docState = await redisClient.getBuffer(`collab:doc:${sessionId}`);
 		if (docState) {
 			Y.applyUpdate(ydoc, docState);
+			this.logger?.info({ sessionId }, "Restored document state from Redis");
+		} else if (metadata.noteContent) {
+			// Initialize document with the initial content from session metadata
+			const yText = ydoc.getText("content");
+			yText.insert(0, metadata.noteContent);
+			
+			// Persist the initial state
+			const initialState = Y.encodeStateAsUpdate(ydoc);
+			await redisClient.setBuffer(
+				`collab:doc:${sessionId}`,
+				Buffer.from(initialState),
+				config.collaboration.sessionTTL,
+			);
+			
+			this.logger?.info({ sessionId }, "Initialized document with initial content");
 		}
 
 		const session: CollaborationSession = {
@@ -132,11 +166,23 @@ export class CollaborationManager {
 		// Set up document update handler to persist changes
 		ydoc.on("update", async (update: Uint8Array) => {
 			try {
+				// Get current document state and merge with the update
+				const currentState = await redisClient.getBuffer(`collab:doc:${sessionId}`);
+				let mergedDoc = new Y.Doc();
+				
+				if (currentState) {
+					Y.applyUpdate(mergedDoc, currentState);
+				}
+				Y.applyUpdate(mergedDoc, update);
+				
+				const newState = Y.encodeStateAsUpdate(mergedDoc);
 				await redisClient.setBuffer(
 					`collab:doc:${sessionId}`,
-					Buffer.from(update),
+					Buffer.from(newState),
 					config.collaboration.sessionTTL,
 				);
+				
+				mergedDoc.destroy();
 			} catch (error) {
 				this.logger?.error(
 					{ error, sessionId },
@@ -266,6 +312,12 @@ export class CollaborationManager {
 				);
 			});
 
+		// Notify other participants about the departure
+		this.broadcastParticipantUpdate(sessionId, {
+			type: "participant-left",
+			participantId,
+		});
+
 		// If no more connections, mark session for cleanup
 		if (session.connections.size === 0) {
 			setTimeout(() => {
@@ -357,6 +409,17 @@ export class CollaborationManager {
 		}
 	}
 
+	private broadcastParticipantUpdate(sessionId: string, message: any): void {
+		const session = this.sessions.get(sessionId);
+		if (session) {
+			session.connections.forEach((ws) => {
+				if (ws.readyState === WebSocket.OPEN) {
+					this.sendMessage(ws, message);
+				}
+			});
+		}
+	}
+
 	private startCleanupInterval(): void {
 		this.cleanupInterval = setInterval(() => {
 			this.performPeriodicCleanup();
@@ -384,6 +447,36 @@ export class CollaborationManager {
 				{ cleanedSessions: sessionsToCleanup.length },
 				"Cleaned up inactive collaboration sessions",
 			);
+		}
+	}
+
+	async getSessionContent(sessionId: string): Promise<string | null> {
+		try {
+			// First try to get from active session
+			const session = this.sessions.get(sessionId);
+			if (session) {
+				const yText = session.ydoc.getText("content");
+				return yText.toString();
+			}
+
+			// If not active, try to restore from Redis
+			const docState = await redisClient.getBuffer(`collab:doc:${sessionId}`);
+			if (docState) {
+				const tempDoc = new Y.Doc();
+				Y.applyUpdate(tempDoc, docState);
+				const yText = tempDoc.getText("content");
+				const content = yText.toString();
+				tempDoc.destroy();
+				return content;
+			}
+
+			return null;
+		} catch (error) {
+			this.logger?.error(
+				{ error, sessionId },
+				"Failed to get session content",
+			);
+			return null;
 		}
 	}
 

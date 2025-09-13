@@ -9,12 +9,21 @@ interface ShareIdParams {
 	shareId: string;
 }
 
+interface CollabCreateBody {
+	noteTitle: string;
+	noteContent: string;
+}
+
 interface CollabStartParams {
 	noteId: string;
 }
 
 interface CollabJoinParams {
 	sessionId: string;
+}
+
+interface CollabJoinBody {
+	participantName?: string;
 }
 
 interface CollabSessionIdParams {
@@ -54,6 +63,24 @@ export const shareIdSchema: JSONSchemaType<ShareIdParams> = {
 	additionalProperties: false,
 };
 
+export const collabCreateSchema: JSONSchemaType<CollabCreateBody> = {
+	type: "object",
+	required: ["noteTitle", "noteContent"],
+	properties: {
+		noteTitle: {
+			type: "string",
+			minLength: 1,
+			maxLength: 200,
+		},
+		noteContent: {
+			type: "string",
+			minLength: 0,
+			maxLength: 500000,
+		},
+	},
+	additionalProperties: false,
+};
+
 export const collabStartSchema: JSONSchemaType<CollabStartParams> = {
 	type: "object",
 	required: ["noteId"],
@@ -82,6 +109,20 @@ export const collabJoinSchema: JSONSchemaType<CollabJoinParams> = {
 	additionalProperties: false,
 };
 
+export const collabJoinBodySchema: JSONSchemaType<CollabJoinBody> = {
+	type: "object",
+	required: [],
+	properties: {
+		participantName: {
+			type: "string",
+			nullable: true,
+			minLength: 1,
+			maxLength: 50,
+		},
+	},
+	additionalProperties: false,
+};
+
 export const collabSessionIdSchema: JSONSchemaType<CollabSessionIdParams> = {
 	type: "object",
 	required: ["sessionId"],
@@ -99,7 +140,9 @@ export const collabSessionIdSchema: JSONSchemaType<CollabSessionIdParams> = {
 export type {
 	ShareBody,
 	ShareIdParams,
+	CollabCreateBody,
 	CollabStartParams,
 	CollabJoinParams,
+	CollabJoinBody,
 	CollabSessionIdParams,
 };

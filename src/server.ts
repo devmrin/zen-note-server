@@ -30,6 +30,9 @@ async function createApp(): Promise<FastifyInstance> {
 	collaborationManager = new CollaborationManager();
 	collaborationManager.setLogger(app.log);
 
+	// Make collaboration manager available to routes
+	app.decorate('collaborationManager', collaborationManager);
+
 	// Register middleware
 	await registerMiddleware(app);
 
@@ -45,6 +48,7 @@ async function createApp(): Promise<FastifyInstance> {
 				const sessionId = (req.params as { sessionId: string }).sessionId;
 				const participantId =
 					(req.headers["x-participant-id"] as string) || req.ip || randomUUID();
+				const participantName = req.headers["x-participant-name"] as string;
 
 				// Validate sessionId format (UUID v4)
 				const uuidRegex =
@@ -55,7 +59,7 @@ async function createApp(): Promise<FastifyInstance> {
 				}
 
 				fastify.log.info(
-					{ sessionId, participantId },
+					{ sessionId, participantId, participantName },
 					"WebSocket connection established",
 				);
 
@@ -63,6 +67,7 @@ async function createApp(): Promise<FastifyInstance> {
 					connection,
 					sessionId,
 					participantId,
+					participantName,
 				);
 			},
 		);
